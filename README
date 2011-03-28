@@ -10,7 +10,7 @@ Usage:
 ======
 
   class MyJob
-    extend Resque::Plugins::BatchedJob
+    extend Resque::Plugins::BatchedLogging
     def self.perform(*args)
       # your job implementation
     end
@@ -20,10 +20,10 @@ Usage:
     enqueue(1,2,3,{:my => :options})
   end
 
-run at least one resque-worker on the queue named 'batched_jobs_logger', it's recommended that you only need one worker processing on this queue, and reasonably low priority, depending on how quickly you need outout.
+run at least one resque-worker on the queue named 'batched_logger', it's recommended that you only need one worker processing on this queue, and reasonably low priority, depending on how quickly you need outout.
 This won't be an issue if you already run your workers with QUEUE=*
 
-The logging of each batch of jobs will be written to a log file at `log/batch_jobs.log` by the BatchedJobsLogger resque job.
+The logging of each batch of jobs will be written to a log file at `log/batched_jobs.log` by the BatchedLogger resque job.
 
 Sample Output:
 ==============

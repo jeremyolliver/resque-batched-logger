@@ -1,7 +1,7 @@
 module Resque
   module Plugins
-    class BatchedJobLogger < Resque::Job
-      @queue = :batched_jobs_logger
+    class BatchedLogger < Resque::Job
+      @queue = :batched_logger
 
       def self.perform(batch_name)
         unless jobs_finished?(batch_name)
@@ -37,7 +37,7 @@ module Resque
           cleanup_batch(batch_name)
         end
       end
-      
+
       private
         def self.jobs_finished?(batch_name)
           jobs = Resque.redis.get("#{batch_name}:jobcount")

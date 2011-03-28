@@ -1,6 +1,6 @@
 module Resque
   module Plugins
-    class Job
+    class BatchedLogging
       # MyJob.in_batches(:batch_name => "MyCustomBatchName") do
       #   enqueue(1,2,3,{:my => :options})
       # end
@@ -19,7 +19,7 @@ module Resque
           raise "Must pass parameters or a block through to a batched group of jobs"
         end
         batch = batch_name || self.to_s
-        Resque::Plugins::BatchedJobLogger.create(batch) # Queue a job to proccess the log information that is stored in redis
+        Resque.enqueue(Resque::Plugins::BatchedLogger, batch) # Queue a job to proccess the log information that is stored in redis
         Resque.redis.set("#{batch}:jobcount", job_count)
       end
 
