@@ -9,6 +9,13 @@ Installation:
 Usage:
 ======
 
+  class MyJob
+    extend Resque::Plugins::BatchedJob
+    def self.perform(*args)
+      # your job implementation
+    end
+  end
+
   MyJob.in_batches(:batch_name => "Daily MyJob run") do
     enqueue(1,2,3,{:my => :options})
   end
