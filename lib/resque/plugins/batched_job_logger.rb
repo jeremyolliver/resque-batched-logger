@@ -28,10 +28,10 @@ module Resque
           log.puts "  Total run time for batch: #{total_time} seconds"
 
           log.puts "  Jobs Completed: #{job_stats[:job_count]}"
-          log.puts "  Average time per job: #{job_stats[:average_time]}"
+          log.puts "  Average time per job: #{job_stats[:average_time]} seconds"
           log.puts "  Total time spent processing jobs: #{job_stats[:processing_time]} seconds"
 
-          log.puts "==== Batched jobs '#{batch_name}' completed in #{total_time} ===="
+          log.puts "==== Batched jobs '#{batch_name}' completed in #{total_time} seconds ===="
           log.close
 
           cleanup_batch(batch_name)
