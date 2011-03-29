@@ -1,7 +1,9 @@
 module Resque
   module Plugins
     module BatchedLogging
-      
+
+      require 'benchmark'
+
       class BatchExists < StandardError; end;
 
       def self.included(base)
@@ -34,21 +36,24 @@ module Resque
 
             # Plugin.around_hook for wrapping the job in logging code
             def around_perform_log_as_batched(*args)
-              stripped_args = args.dup # In case we need to use the unmodified original arguments
-              options = stripped_args.extract_options!.symbolize_keys
-              if options.keys.include?(:batched_log_group)
+              # stripped_args = args.dup # In case we need to use the unmodified original arguments
+              # options = stripped_args.extract_options!.symbolize_keys
+              last = args.last
+              queued_with_batching = last && last.is_a?(Hash) && last.keys.include?(:batched_log_group)
+              if queued_with_batching
+                options = args.pop # Remove our custom options hash
                 if batch_name = options[:batched_log_group]
                   # Perform our logging
                   start_time = Time.now
-                  runlength = Benchmark.realtime do
-                    yield(*stripped_args)
+                  run_time = Benchmark.realtime do
+                    yield(*args)
                   end
                   end_time = Time.now
                   # Store, [run_time, start_time, end_time] as an entry into redis under in an array for this specific job type & queue
                   Resque.redis.lpush(batch_name, [run_time, start_time, end_time]) # Push the values onto the end of the list (will create the list if it doesn't exist)
                   # End of our logging
                 else
-                  yield(*stripped_args) #Still strip the parameters to standard format, but don't log
+                  yield(*args) #Still strip the parameters to standard format, but don't log
                 end
               else
                 yield # Send through the original, if there was no :batched option sent through

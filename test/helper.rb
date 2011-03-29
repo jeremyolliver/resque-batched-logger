@@ -20,5 +20,13 @@ require 'shared_utilities'
 class MiniTest::Unit::TestCase
 end
 
+def global_teardown
+  Resque.redis.flushdb
+  Resque.clear_test_jobs
+  SampleJob.clear_history
+  SampleModuleJob.clear_history
+  FileUtils.rm(Resque::Plugins::BatchedLogger::LOG_FILE) if File.exist?(Resque::Plugins::BatchedLogger::LOG_FILE)
+end
+
 
 MiniTest::Unit.autorun
