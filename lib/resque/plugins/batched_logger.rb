@@ -6,7 +6,7 @@ module Resque
       def self.perform(batch_name)
         unless jobs_finished?(batch_name)
           sleep 5                  # Wait 5 seconds
-          self.enqueue(batch_name) # Requeue, to check again
+          Resque.enqueue(self, batch_name) # Requeue, to check again
         else
           # Pull in the info stored in redis
           job_stats = {:processing_time => 0, :longest_processing_time => nil, :job_count => Resque.redis.get("#{batch_name}:jobcount"), :start_time => nil, :finish_time => nil}

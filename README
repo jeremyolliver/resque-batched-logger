@@ -16,7 +16,7 @@ Usage:
     end
   end
 
-  MyJob.in_batches(:batch_name => "Daily MyJob run") do
+  MyJob.batched(:batch_name => "Daily MyJob run") do
     enqueue(1,2,3,{:my => :options})
   end
 
@@ -40,5 +40,5 @@ Sample Output:
 How it works:
 =============
 
-Enqueueing jobs with `MyJob.in_batches` syntax behind the scenes will create your jobs with an extra options hash containing the batched options (`MyJob.enqueue(1,2,3,{:my => :options}, {:batched => true})`)
+Enqueueing jobs with `MyJob.batched` syntax behind the scenes will create your jobs with an extra options hash containing the batched options (`MyJob.enqueue(1,2,3,{:my => :options}, {:batched => true})`)
 the Resque::Job#perform method has been wrapped in benchmarking code that is only run when the :batched option is set on jobs. This logging information is stored in redis, and once all the jobs present in the batch have been performed, the BatchedJobsLogger pulls this information out of redis again and processes it.
