@@ -28,6 +28,23 @@ class TestBatchedLogger < MiniTest::Unit::TestCase
     assert final_completion_time = logged_data.match(Regexp.new("==== Batched jobs \'#{batch_name}\' completed at .* took ([\\d\\.]+) seconds ===="))[1]
     assert_equal(total_run_time, final_completion_time, "Final completion length should match total time for batch")
   end
+  
+  def test_logger_running_before_jobs_finished
+    batch_name = sanitize_batch("My Batch Name")
+    Resque::Plugins::BatchedLogger.perform(batch_name) # Should do no work
+    assert_empty Resque.test_jobs
+    arguments = [[1,2,3], [5,6,{:custom => :options}]]
+    SampleJob.batched(:batch_name => batch_name) do
+      arguments.each do |arg|
+        enqueue(*arg)
+      end
+    end
+    assert_equal 3, Resque.test_jobs.size
+    Resque.test_jobs.pop.perform # Try doing the batch logger first, should be requeued
+    assert_equal 3, Resque.test_jobs.size, "The batch logger should have been requeued"
+    Resque.perform_test_jobs
+    assert_empty Resque.test_jobs
+  end
 
   def teardown
     global_teardown

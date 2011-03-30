@@ -1,6 +1,7 @@
 # Test Helper classes
 class SampleJob
   @@job_history = []
+  @queue = 'sample_job_queue'
   include Resque::Plugins::BatchedLogging
 
   def self.perform(*args)
@@ -41,9 +42,9 @@ module Resque
       @args = args
     end
     def perform
-      payload = {'class' => @args.shift, 'args' => @args }
+      local_payload = {'class' => @args.shift, 'args' => @args }
       # Perform using Resque::Job, because that's what implements the hooks we need to test
-      Resque::Job.new('test_queue', payload).perform
+      Resque::Job.new('test_queue', local_payload).perform
     end
   end
   def self.enqueue(*args)
@@ -55,9 +56,13 @@ module Resque
   def self.clear_test_jobs
     @@test_jobs = []
   end
-  def self.perform_test_jobs
+  def self.perform_test_jobs(options = {})
+    number_processed = 0
     while job = @@test_jobs.shift # Pop from the front of the array of pending jobs
       job.perform
+      number_processed +=1
+      break if number_processed == options[:limit]
     end
+    number_processed
   end
 end

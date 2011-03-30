@@ -36,29 +36,36 @@ module Resque
 
             # Plugin.around_hook for wrapping the job in logging code
             def around_perform_log_as_batched(*args)
-              # stripped_args = args.dup # In case we need to use the unmodified original arguments
-              # options = stripped_args.extract_options!.symbolize_keys
-              last = args.last
-              queued_with_batching = last && last.is_a?(Hash) && last.keys.include?(:batched_log_group)
-              if queued_with_batching
-                options = args.pop # Remove our custom options hash
-                if batch_name = options[:batched_log_group]
-                  # Perform our logging
-                  start_time = Time.now
-                  run_time = Benchmark.realtime do
-                    yield(*args)
-                  end
-                  end_time = Time.now
-                  # Store, [run_time, start_time, end_time] as an entry into redis under in an array for this specific job type & queue
-                  # rpush appends to the end of a list in redis
-                  Resque.redis.rpush("batch_stats:#{batch_name}", [run_time, start_time, end_time].to_json) # Push the values onto the end of the list (will create the list if it doesn't exist)
-                  # End of our logging
-                else
-                  yield(*args) #Still strip the parameters to standard format, but don't log
+              options = args.last
+              queued_with_batching = options && options.is_a?(Hash) && options.keys.include?(:batched_log_group)
+              # We are unable to remove the custom options hash that is present here, so 
+              if batch_name = self.group_batched_name
+                self.stop_logging_batched # We know we're logging now, so turn it back off
+                # Perform our logging
+                start_time = Time.now
+                run_time = Benchmark.realtime do
+                  yield
                 end
+                end_time = Time.now
+                # Store, [run_time, start_time, end_time] as an entry into redis under in an array for this specific job type & queue
+                # rpush appends to the end of a list in redis
+                Resque.redis.rpush("batch_stats:#{batch_name}", [run_time, start_time, end_time].to_json) # Push the values onto the end of the list (will create the list if it doesn't exist)
+                # End of our logging
               else
-                yield # Send through the original, if there was no :batched option sent through
+                yield # Just perform the standard job without benchmarking
               end
+            end
+
+            @@group_batched_name = nil
+            def group_batched_name
+              @@group_batched_name
+            end
+            alias :logging_as_batched? :group_batched_name
+            def start_logging_batched(batch)
+              @@group_batched_name = batch
+            end
+            def stop_logging_batched
+              @@group_batched_name = nil
             end
 
           end

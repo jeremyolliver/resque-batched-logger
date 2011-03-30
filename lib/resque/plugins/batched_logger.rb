@@ -1,17 +1,25 @@
 module Resque
   module Plugins
     class BatchedLogger < Resque::Job
+
+      require 'time'
+
       @queue = :batched_logger
-      
       LOG_FILE = "log/batched_jobs.log"
 
       def self.perform(batch_name)
-        unless jobs_finished?(batch_name)
-          sleep 5                  # Wait 5 seconds
+        if !batch_to_log?(batch_name)
+          log = File.open(LOG_FILE, "w")
+          log.puts("No jobs to log for '#{batch_name}'")
+          log.close
+        elsif jobs_pending?(batch_name)
+          sleep 5                          # Wait 5 seconds
           Resque.enqueue(self, batch_name) # Requeue, to check again
         else
+          # Start processing the logs
           # Pull in the info stored in redis
           job_stats = {:processing_time => 0, :longest_processing_time => 0, :job_count => Resque.redis.get("#{batch_name}:jobcount"), :start_time => nil, :finish_time => nil}
+          Resque.redis.del("#{batch_name}:jobcount") # Stop any other logging processes picking up the same job
           # lpop pops the first element off the list in redis
           while job = Resque.redis.lpop("batch_stats:#{batch_name}")
             job = decode_job(job) # Decode from string format
@@ -40,14 +48,22 @@ module Resque
           log.puts "==== Batched jobs '#{batch_name}' completed at #{job_stats[:finish_time]} took #{job_stats[:total_time]} seconds ===="
           log.close
 
-          cleanup_batch(batch_name)
+          Resque.redis.del("batch_stats:#{batch_name}") # Cleanup the array of stats we've just processed (it should be empty)
         end
       end
 
       private
-        def self.jobs_finished?(batch_name)
+        def self.jobs_pending?(batch_name)
           jobs = Resque.redis.get("#{batch_name}:jobcount")
-          jobs && Resque.redis.llen("batch_stats:#{batch_name}") == jobs.to_i
+          jobs && Resque.redis.llen("batch_stats:#{batch_name}") < jobs.to_i
+        end
+        def self.batch_to_log?(batch_name)
+          jobs = Resque.redis.get("#{batch_name}:jobcount")
+          if jobs
+            jobs.to_i
+          else
+            nil
+          end
         end
 
         def self.decode_job(job)
@@ -55,11 +71,6 @@ module Resque
           job[1] = Time.parse(job[1])
           job[2] = Time.parse(job[2])
           job
-        end
-
-        def self.cleanup_batch(batch_name)
-          Resque.redis.del("#{batch_name}:jobcount")
-          Resque.redis.del("batch_stats:#{batch_name}")
         end
     end
   end

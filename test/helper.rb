@@ -19,10 +19,14 @@ require 'resque-batched-logger'
 require 'shared_utilities'
 
 class MiniTest::Unit::TestCase
+  def setup
+    global_teardown
+  end
 end
 
 def global_teardown
   # Don't do a flushdb on redis, that doesn't respect the namespace
+  Resque.redis.flushdb
   Resque.redis.keys("*:jobcount").each {|k| Resque.redis.del("'#{k.to_s}'") }     # Clear our job count
   Resque.redis.keys("batch_stats:*").each {|k| Resque.redis.del("'#{k.to_s}'") }  # Clear the lists of job stats
   Resque.clear_test_jobs
@@ -30,6 +34,7 @@ def global_teardown
   SampleModuleJob.clear_history
   FileUtils.rm(Resque::Plugins::BatchedLogger::LOG_FILE) if File.exist?(Resque::Plugins::BatchedLogger::LOG_FILE)
 end
+# global_teardown
 
 # convenience shortcut
 def sanitize_batch(name)
