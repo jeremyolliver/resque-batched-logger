@@ -1,6 +1,8 @@
 Resque Batched Logger
 =====================
 
+ResqueBatchedLogger is an extension to the fantastic background work gem 'resque'. This extension is intended for when you have large volumes of work you process in logical groups, or batches, and want timing, and logging information on the group as a whole. For example we have a daily import process which spawns a large amount of several types of jobs, running a couple of hours. This grouped logging lets us track when those jobs finish, and how long each took (by type)
+
 Installation:
 =============
 
@@ -9,19 +11,22 @@ Installation:
 Usage:
 ======
 
+  # include the module in your job classes
   class MyJob
-    extend Resque::Plugins::BatchedLogging
+    include Resque::Plugins::BatchedLogging
     def self.perform(*args)
       # your job implementation
     end
   end
 
+  # enqueue your jobs by calling #enqueue from within a batched block on your job classes
+  # This will call any custom #self.enqueue or #self.create methods defined on your job class, defaulting to the standard Resque.enqueue after wrapping your job in it's logging code
+  # batch names are unique, so only one batch with a given name can exist at once 
   MyJob.batched(:batch_name => "Daily MyJob run") do
     enqueue(1,2,3,{:my => :options})
   end
 
-run at least one resque-worker on the queue named 'batched_logger', it's recommended that you only need one worker processing on this queue, and reasonably low priority, depending on how quickly you need outout.
-This won't be an issue if you already run your workers with QUEUE=*
+You'll need to run at least one resque-worker on the queue named 'batched_logger', (recommended only one for consistency of log ordering) this worker can be reasonably low priority, depending on how quickly you need output to the logfile.
 
 The logging of each batch of jobs will be written to a log file at `log/batched_jobs.log` by the BatchedLogger resque job.
 
@@ -40,5 +45,5 @@ Sample Output:
 How it works:
 =============
 
-Enqueueing jobs with `MyJob.batched` syntax behind the scenes will create your jobs with an extra options hash containing the batched options (`MyJob.enqueue(1,2,3,{:my => :options}, {:batched => true})`)
+Enqueueing jobs with `MyJob.batched` syntax behind the scenes will create your jobs with an extra options hash containing the batched options (`MyJob.enqueue(1,2,3,{:my => :options}, {:batched => true})`), and store some tracking information in redis
 the Resque::Job#perform method has been wrapped in benchmarking code that is only run when the :batched option is set on jobs. This logging information is stored in redis, and once all the jobs present in the batch have been performed, the BatchedJobsLogger pulls this information out of redis again and processes it.

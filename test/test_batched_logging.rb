@@ -11,13 +11,14 @@ class TestBatchedLogging < MiniTest::Unit::TestCase
 
   def test_enqueueing_a_batch
     arguments = [[1,2,3], [5,6,{:custom => :options}]]
-    SampleJob.batched(:batch_name => "Daily SampleGroup run") do
+    batch_name = "Daily SampleGroup run"
+    SampleJob.batched(:batch_name => batch_name) do
       arguments.each do |arg|
         enqueue(*arg)
       end
     end
-    expected_job_list = arguments.collect {|j| [SampleJob] + j + [{:batched_log_group => "Daily SampleGroup run"}] } # Jobs should be enqueued with correct Job class, and batch group
-    expected_job_list << [Resque::Plugins::BatchedLogger, "Daily SampleGroup run"] # We expect the BatchedLogger to have been enqueued as well
+    expected_job_list = arguments.collect {|j| [SampleJob] + j + [{:batched_log_group => sanitize_batch(batch_name)}] } # Jobs should be enqueued with correct Job class, and batch group
+    expected_job_list << [Resque::Plugins::BatchedLogger, sanitize_batch(batch_name)] # We expect the BatchedLogger to have been enqueued as well
     assert_equal expected_job_list, Resque.test_jobs.collect(&:args), "Enqueued arguments should have a batch name hash appened"
 
     Resque.perform_test_jobs

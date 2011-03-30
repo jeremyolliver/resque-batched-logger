@@ -14,7 +14,7 @@ module Resque
             #   enqueue(1,2,3,{:my => :options})
             # end
             def batched(options = {}, &block)
-              batch_name = options[:batch_name] || self.to_s
+              batch_name = Resque::Plugins::BatchedLogging.sanitize_batch_name(options[:batch_name] || self.to_s)
               raise Resque::Plugins::BatchedLogging::BatchExists.new("Batch name '#{batch_name}' exists already") if Resque.redis.get("#{batch_name}:jobcount")
 
               job_count = 0
@@ -50,7 +50,8 @@ module Resque
                   end
                   end_time = Time.now
                   # Store, [run_time, start_time, end_time] as an entry into redis under in an array for this specific job type & queue
-                  Resque.redis.lpush(batch_name, [run_time, start_time, end_time]) # Push the values onto the end of the list (will create the list if it doesn't exist)
+                  # rpush appends to the end of a list in redis
+                  Resque.redis.rpush("batch_stats:#{batch_name}", [run_time, start_time, end_time].to_json) # Push the values onto the end of the list (will create the list if it doesn't exist)
                   # End of our logging
                 else
                   yield(*args) #Still strip the parameters to standard format, but don't log
@@ -70,7 +71,7 @@ module Resque
         attr_accessor :job_count
         def initialize(job_type, batch_name)
           @job_type = job_type
-          @batch_name = batch_name || @job_type.to_s
+          @batch_name = Resque::Plugins::BatchedLogging.sanitize_batch_name(batch_name || @job_type.to_s)
           @job_count = 0
         end
         def run(&block)
@@ -89,6 +90,13 @@ module Resque
           @job_count += 1
         end
         alias :create :enqueue
+      end
+      
+      private
+      
+      # No spaces in redis keys
+      def self.sanitize_batch_name(name)
+        name.gsub(" ", "_")
       end
 
     end

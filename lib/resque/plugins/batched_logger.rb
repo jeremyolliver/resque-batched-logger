@@ -11,13 +11,15 @@ module Resque
           Resque.enqueue(self, batch_name) # Requeue, to check again
         else
           # Pull in the info stored in redis
-          job_stats = {:processing_time => 0, :longest_processing_time => 0, :job_count => Resque.redis.get("#{batch_name}:jobcount"), :start_time => nil, :finish_time => 0}
-          while job = Resque.redis.lpop(batch_name)
-            # job = JSON.parse(job) # Decode from string format
-            #job [run_time, start_time, end_time]
+          job_stats = {:processing_time => 0, :longest_processing_time => 0, :job_count => Resque.redis.get("#{batch_name}:jobcount"), :start_time => nil, :finish_time => nil}
+          # lpop pops the first element off the list in redis
+          while job = Resque.redis.lpop("batch_stats:#{batch_name}")
+            job = decode_job(job) # Decode from string format
+            # job => [run_time, start_time, end_time]
             job_stats[:processing_time] += job[0]                                                           # run_time
             job_stats[:longest_processing_time] = job[0] if job[0] > job_stats[:longest_processing_time]
             job_stats[:start_time] ||= job[1]                                                               # start_time
+            job_stats[:finish_time] ||= job[2]
             job_stats[:finish_time] = job[2] if job[2] > job_stats[:finish_time]                            # end_time
           end
           job_stats[:total_time] = job_stats[:finish_time] - job_stats[:start_time]
@@ -35,7 +37,7 @@ module Resque
           log.puts "  Average time per job: #{job_stats[:average_time]} seconds"
           log.puts "  Total time spent processing jobs: #{job_stats[:processing_time]} seconds"
 
-          log.puts "==== Batched jobs '#{batch_name}' completed in #{job_stats[:total_time]} seconds ===="
+          log.puts "==== Batched jobs '#{batch_name}' completed at #{job_stats[:finish_time]} took #{job_stats[:total_time]} seconds ===="
           log.close
 
           cleanup_batch(batch_name)
@@ -45,11 +47,19 @@ module Resque
       private
         def self.jobs_finished?(batch_name)
           jobs = Resque.redis.get("#{batch_name}:jobcount")
-          jobs && Resque.redis.llen(batch_name) == jobs.to_i
+          jobs && Resque.redis.llen("batch_stats:#{batch_name}") == jobs.to_i
+        end
+
+        def self.decode_job(job)
+          job = JSON.parse(job)
+          job[1] = Time.parse(job[1])
+          job[2] = Time.parse(job[2])
+          job
         end
 
         def self.cleanup_batch(batch_name)
           Resque.redis.del("#{batch_name}:jobcount")
+          Resque.redis.del("batch_stats:#{batch_name}")
         end
     end
   end

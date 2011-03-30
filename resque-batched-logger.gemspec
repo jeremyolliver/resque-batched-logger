@@ -18,9 +18,10 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
 
   s.add_dependency 'resque'
+  # redis and json, are already dependencies of resque, but declaring these explicitly since these libraries are directly called from within this gem
   s.add_dependency 'redis'
   s.add_dependency 'json'
   s.add_development_dependency 'bundler'
   s.add_development_dependency 'minitest'
-  s.add_development_dependency 'ruby-debug'
+  s.add_development_dependency 'rcov'
 end

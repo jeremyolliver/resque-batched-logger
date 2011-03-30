@@ -9,7 +9,8 @@ rescue Bundler::BundlerError => e
 end
 require 'minitest/unit'
 require 'resque'
-# Namespace our tests, because we'll be flushing the redis db
+
+# Namespace our tests
 Resque.redis = Redis::Namespace.new('batched-logger/test:', :redis => Resque.redis)
 
 $LOAD_PATH.unshift(File.dirname(__FILE__))
@@ -21,11 +22,18 @@ class MiniTest::Unit::TestCase
 end
 
 def global_teardown
-  Resque.redis.flushdb
+  # Don't do a flushdb on redis, that doesn't respect the namespace
+  Resque.redis.keys("*:jobcount").each {|k| Resque.redis.del("'#{k.to_s}'") }     # Clear our job count
+  Resque.redis.keys("batch_stats:*").each {|k| Resque.redis.del("'#{k.to_s}'") }  # Clear the lists of job stats
   Resque.clear_test_jobs
   SampleJob.clear_history
   SampleModuleJob.clear_history
   FileUtils.rm(Resque::Plugins::BatchedLogger::LOG_FILE) if File.exist?(Resque::Plugins::BatchedLogger::LOG_FILE)
+end
+
+# convenience shortcut
+def sanitize_batch(name)
+  Resque::Plugins::BatchedLogging.sanitize_batch_name(name)
 end
 
 
