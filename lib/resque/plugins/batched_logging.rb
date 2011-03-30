@@ -13,22 +13,18 @@ module Resque
             # MyJob.batched(:batch_name => "MyCustomBatchName") do
             #   enqueue(1,2,3,{:my => :options})
             # end
-            def batched(options = {}, &block)
-              batch_name = Resque::Plugins::BatchedLogging.sanitize_batch_name(options[:batch_name] || self.to_s)
-              raise Resque::Plugins::BatchedLogging::BatchExists.new("Batch name '#{batch_name}' exists already") if Resque.redis.get("#{batch_name}:jobcount")
+            def batched(&block)
+              batch_name = self.to_s # Group the batch of jobs by the job's class name
+              raise Resque::Plugins::BatchedLogging::BatchExists.new("Batch for '#{batch_name}' exists already") if Resque.redis.get("#{batch_name}:jobcount")
 
               job_count = 0
-              if params_list = options[:paramaters]
-                job_count = params_list.size
-                params_list.each do |params|
-                  self.enqueue(self, *(params + [{:batched_log_group => batch_name}]))
-                end
-              elsif block_given?
-                proxy_obj = BatchLoggerProxy.new(self, batch_name)
+              Resque.redis.set("#{batch_name}:jobcount", job_count) # Set the job count right away, because the workers will check for it's existence
+              if block_given?
+                proxy_obj = Resque::Plugins::BatchedLogging::BatchLoggerProxy.new(self, batch_name)
                 proxy_obj.run(&block)
                 job_count = proxy_obj.job_count
               else
-                raise "Must pass parameters or a block through to a batched group of jobs"
+                raise "Must pass a block through to a batched group of jobs"
               end
               Resque.enqueue(Resque::Plugins::BatchedLogger, batch_name) # Queue a job to proccess the log information that is stored in redis
               Resque.redis.set("#{batch_name}:jobcount", job_count)
@@ -36,11 +32,9 @@ module Resque
 
             # Plugin.around_hook for wrapping the job in logging code
             def around_perform_log_as_batched(*args)
-              options = args.last
-              queued_with_batching = options && options.is_a?(Hash) && options.keys.include?(:batched_log_group)
-              # We are unable to remove the custom options hash that is present here, so 
-              if batch_name = self.group_batched_name
-                self.stop_logging_batched # We know we're logging now, so turn it back off
+              batch_name = self.to_s
+              # Presence of the jobcount variable means that batched logging is enabled for this job type
+              if Resque.redis.get("#{batch_name}:jobcount")
                 # Perform our logging
                 start_time = Time.now
                 run_time = Benchmark.realtime do
@@ -56,18 +50,6 @@ module Resque
               end
             end
 
-            @@group_batched_name = nil
-            def group_batched_name
-              @@group_batched_name
-            end
-            alias :logging_as_batched? :group_batched_name
-            def start_logging_batched(batch)
-              @@group_batched_name = batch
-            end
-            def stop_logging_batched
-              @@group_batched_name = nil
-            end
-
           end
         end
       end
@@ -78,7 +60,7 @@ module Resque
         attr_accessor :job_count
         def initialize(job_type, batch_name)
           @job_type = job_type
-          @batch_name = Resque::Plugins::BatchedLogging.sanitize_batch_name(batch_name || @job_type.to_s)
+          @batch_name = batch_name || @job_type.to_s
           @job_count = 0
         end
         def run(&block)
@@ -86,24 +68,16 @@ module Resque
         end
         # Capture #create, and #enqueue calls that are done within the scope of a MyJob.in_batches block and enqueue the original job
         def enqueue(*args)
-          arguments = args + [{:batched_log_group => @batch_name}]
           if @job_type.respond_to?(:enqueue)
-            @job_type.enqueue(*arguments)
+            @job_type.enqueue(*args)
           elsif @job_type.respond_to?(:create)
-            @job_type.create(*arguments)
+            @job_type.create(*args)
           else
-            Resque.enqueue(@job_type, *arguments)
+            Resque.enqueue(@job_type, *args)
           end
           @job_count += 1
         end
         alias :create :enqueue
-      end
-      
-      private
-      
-      # No spaces in redis keys
-      def self.sanitize_batch_name(name)
-        name.gsub(" ", "_")
       end
 
     end

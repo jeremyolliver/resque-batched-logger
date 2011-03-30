@@ -21,8 +21,8 @@ Usage:
 
   # enqueue your jobs by calling #enqueue from within a batched block on your job classes
   # This will call any custom #self.enqueue or #self.create methods defined on your job class, defaulting to the standard Resque.enqueue after wrapping your job in it's logging code
-  # batch names are unique, so only one batch with a given name can exist at once 
-  MyJob.batched(:batch_name => "Daily MyJob run") do
+  # jobs will be batched grouped by the job class name, and must be unique so for running multiple batches at once see below on how to do so with subclassing.
+  MyJob.batched do
     enqueue(1,2,3,{:my => :options})
   end
 
@@ -37,13 +37,39 @@ Sample Output:
     batch started processing at: Mon Mar 28 16:23:00 +1300 2011
     batch finished processing at: Mon Mar 28 16:25:02 +1300 2011
     Total run time for batch: 122 seconds
-    Jobs Completed: 220
+    Jobs Enqueued: 220
+    Jobs Processed: 220
     Average time per job: 0.527 seconds
     Total time spent processing jobs: 116 seconds
-  ==== Batched jobs 'Daily MyJob run' completed in 122 seconds ====
+  ==== Batched jobs 'Daily MyJob run' completed at Mon Mar 28 16:25:02 +1300 2011 took 122 seconds ====
 
-How it works:
-=============
+Advanced Usage
+==============
 
-Enqueueing jobs with `MyJob.batched` syntax behind the scenes will create your jobs with an extra options hash containing the batched options (`MyJob.enqueue(1,2,3,{:my => :options}, {:batched => true})`), and store some tracking information in redis
-the Resque::Job#perform method has been wrapped in benchmarking code that is only run when the :batched option is set on jobs. This logging information is stored in redis, and once all the jobs present in the batch have been performed, the BatchedJobsLogger pulls this information out of redis again and processes it.
+For batching jobs of the same type in multiple groups, or if your application might enqueue jobs of the same type while your batched jobs are running, it is recommended that you subclass your jobs for a batched class, to allow an exclusive batch scope
+
+example:
+
+  class BackendLifting
+    @queue = :standard
+    def self.perform(user_id)
+      # do something
+    end
+  end
+  class BatchedBackendLifting < BackendLifting
+    # This is simply to provide an exclusive scope
+  end
+
+This allows you to batch your jobs via:
+
+  BatchedBackendLifting.batched do
+    user_ids.each do |id|
+      enqueue(id)
+    end
+  end
+
+Which will prevent any `BackendLifting` jobs your application enqueues simultaneously from being inadvertently logged as a batched job. This is only necessary if you want to guarantee there are no additional jobs added to the logging of your batch, or the ability to enqueue multiple batches at once.
+
+How it works
+============
+Log information is stored in redis until all jobs have been processed, and once all the jobs present in the batch have been performed, the `BatchedJobsLogger` pulls this information out of redis, aggregates it and outputs it to the logfile 'log/batched_jobs.log'.

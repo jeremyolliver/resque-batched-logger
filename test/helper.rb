@@ -19,9 +19,9 @@ require 'resque-batched-logger'
 require 'shared_utilities'
 
 class MiniTest::Unit::TestCase
-  def setup
-    global_teardown
-  end
+  # def setup
+  #   global_teardown
+  # end
 end
 
 def global_teardown
@@ -34,12 +34,7 @@ def global_teardown
   SampleModuleJob.clear_history
   FileUtils.rm(Resque::Plugins::BatchedLogger::LOG_FILE) if File.exist?(Resque::Plugins::BatchedLogger::LOG_FILE)
 end
-# global_teardown
-
-# convenience shortcut
-def sanitize_batch(name)
-  Resque::Plugins::BatchedLogging.sanitize_batch_name(name)
-end
+global_teardown
 
 
 MiniTest::Unit.autorun

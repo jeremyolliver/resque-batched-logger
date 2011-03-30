@@ -18,7 +18,11 @@ module Resque
         else
           # Start processing the logs
           # Pull in the info stored in redis
-          job_stats = {:processing_time => 0, :longest_processing_time => 0, :job_count => Resque.redis.get("#{batch_name}:jobcount"), :start_time => nil, :finish_time => nil}
+          job_stats = {
+            :processing_time => 0,      :longest_processing_time => 0,
+            :processed_job_count => 0,  :enqueued_job_count => Resque.redis.get("#{batch_name}:jobcount"),
+            :start_time => nil,         :finish_time => nil
+          }
           Resque.redis.del("#{batch_name}:jobcount") # Stop any other logging processes picking up the same job
           # lpop pops the first element off the list in redis
           while job = Resque.redis.lpop("batch_stats:#{batch_name}")
@@ -29,11 +33,14 @@ module Resque
             job_stats[:start_time] ||= job[1]                                                               # start_time
             job_stats[:finish_time] ||= job[2]
             job_stats[:finish_time] = job[2] if job[2] > job_stats[:finish_time]                            # end_time
+            job_stats[:processed_job_count] += 1
           end
+          Resque.redis.del("batch_stats:#{batch_name}") # Cleanup the array of stats we've just processed (it should be empty now)
+
           job_stats[:total_time] = job_stats[:finish_time] - job_stats[:start_time]
 
           # Aggregate stats
-          job_stats[:average_time] = job_stats[:total_time] / job_stats[:job_count].to_f
+          job_stats[:average_time] = job_stats[:total_time] / job_stats[:processed_job_count].to_f
           FileUtils.mkdir_p(File.dirname(LOG_FILE))
           log = File.open(LOG_FILE, "w")
           log.puts "==== Batched jobs '#{batch_name}' : logged at #{Time.now.to_s} ===="
@@ -41,29 +48,24 @@ module Resque
           log.puts "  batch finished processing at: #{job_stats[:finish_time]}"
           log.puts "  Total run time for batch: #{job_stats[:total_time]} seconds"
 
-          log.puts "  Jobs Completed: #{job_stats[:job_count]}"
+          log.puts "  Jobs Enqueued: #{job_stats[:enqueued_job_count]}"
+          log.puts "  Jobs Processed: #{job_stats[:processed_job_count]}"
           log.puts "  Average time per job: #{job_stats[:average_time]} seconds"
           log.puts "  Total time spent processing jobs: #{job_stats[:processing_time]} seconds"
 
           log.puts "==== Batched jobs '#{batch_name}' completed at #{job_stats[:finish_time]} took #{job_stats[:total_time]} seconds ===="
           log.close
-
-          Resque.redis.del("batch_stats:#{batch_name}") # Cleanup the array of stats we've just processed (it should be empty)
         end
       end
 
       private
+        # It is possible that there might be more jobs processed than the number specified, in those cases we will process them all anyway
         def self.jobs_pending?(batch_name)
           jobs = Resque.redis.get("#{batch_name}:jobcount")
           jobs && Resque.redis.llen("batch_stats:#{batch_name}") < jobs.to_i
         end
         def self.batch_to_log?(batch_name)
           jobs = Resque.redis.get("#{batch_name}:jobcount")
-          if jobs
-            jobs.to_i
-          else
-            nil
-          end
         end
 
         def self.decode_job(job)

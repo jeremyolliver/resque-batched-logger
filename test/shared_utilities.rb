@@ -17,6 +17,10 @@ class SampleJob
   end
 end
 
+class BatchedSampleJob < SampleJob
+  # This subclass is simply for namespacing batched 'SampleJob's
+end
+
 module SampleModuleJob
   @@job_history = []
   include Resque::Plugins::BatchedLogging
