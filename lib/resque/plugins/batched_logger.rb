@@ -38,7 +38,7 @@ module Resque
           Resque.redis.del("batch_stats:#{batch_name}") # Cleanup the array of stats we've just processed (it should be empty now)
           
           FileUtils.mkdir_p(File.dirname(LOG_FILE))
-          log = File.open(LOG_FILE, "w")
+          log = File.open(LOG_FILE, "w+")
           begin
             if job_stats[:processed_job_count].zero?
               log_empty_batch(batch_name, log)
