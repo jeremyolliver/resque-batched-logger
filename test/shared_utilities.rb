@@ -6,7 +6,7 @@ class SampleJob
 
   def self.perform(*args)
     @@job_history << args
-    sleep 1
+    sleep(0.5)
   end
 
   def self.job_history
@@ -27,7 +27,7 @@ module SampleModuleJob
 
   def self.perform(*args)
     @@job_history << args
-    sleep 1
+    sleep(0.5)
   end
   def self.job_history
     @@job_history

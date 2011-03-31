@@ -40,6 +40,30 @@ class TestBatchedLogging < MiniTest::Unit::TestCase
     assert_empty Resque.test_jobs, "Queue should be empty"
   end
 
+  def test_queuing_multiple_batches
+    arguments = [[1,2,3], [4,5], [5,6,{:custom => :options}]]
+    # Should be able to do this twice without raising an error
+    2.times do
+      SampleJob.batched do
+        arguments.each do |args|
+          enqueue(*args)
+        end
+      end
+      assert_equal 4, Resque.test_jobs.size, "3 jobs + the logger job should have been queued"
+      Resque.perform_test_jobs
+      assert_empty Resque.test_jobs
+    end
+  end
+
+  def test_queueing_nothing
+    SampleJob.batched do
+      [].each do |args|
+        enqueue(*args)
+      end
+    end
+    Resque.perform_test_jobs
+  end
+
   def test_single_jobs_dont_interrupt_batch
     arguments = [[1,2,3], [4,5], [5,6,{:custom => :options}]]
     SampleJob.batched do
