@@ -18,8 +18,9 @@ of time each job took to execute.
 First, include the `BatchedLogging` module in your job classes:
 
     class MyJob
-      include Resque::Plugins::BatchedLogging
       @queue = :standard
+      extend Resque::Plugins::BatchedLogging
+
       def self.perform(*args)
         # your job implementation
       end
@@ -59,6 +60,8 @@ exclusive batch scope.
 
     class BackendLifting
       @queue = :standard
+      extend Resque::Plugins::BatchedLogging
+
       def self.perform(*args)
         # your job implementation
       end

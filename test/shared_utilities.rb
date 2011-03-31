@@ -2,7 +2,7 @@
 class SampleJob
   @@job_history = []
   @queue = 'sample_job_queue'
-  include Resque::Plugins::BatchedLogging
+  extend Resque::Plugins::BatchedLogging
 
   def self.perform(*args)
     @@job_history << args
@@ -23,7 +23,7 @@ end
 
 module SampleModuleJob
   @@job_history = []
-  include Resque::Plugins::BatchedLogging
+  extend Resque::Plugins::BatchedLogging
 
   def self.perform(*args)
     @@job_history << args
@@ -34,6 +34,35 @@ module SampleModuleJob
   end
   def self.clear_history
     @@job_history = []
+  end
+end
+
+class CustomJob
+  @queue = 'sample_job_queue'
+  @@job_history = []
+  @@custom_created = []
+  extend Resque::Plugins::BatchedLogging
+  def self.perform(*args)
+    @@job_history << args
+    sleep(0.5)
+  end
+  def self.create(*args)
+    @@custom_created << args
+    Resque.enqueue(self, args)
+  end
+  def self.custom_created_history
+    @@custom_created
+  end
+end
+
+class SuperCustomJob < CustomJob
+  @@custom_enqueued = []
+  def self.enqueue(*args)
+    @@custom_enqueued << args
+    Resque.enqueue(self, args)
+  end
+  def self.custom_enqueued_history
+    @@custom_enqueued
   end
 end
 

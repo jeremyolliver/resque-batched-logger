@@ -21,7 +21,7 @@ Gem::Specification.new do |s|
   # redis and json, are already dependencies of resque, but declaring these explicitly since these libraries are directly called from within this gem
   s.add_dependency 'redis'
   s.add_dependency 'json'
-  s.add_dependency 'SystemTimer' # prevents a warning about using old Timer class
+  s.add_dependency 'SystemTimer', '>= 1.1' # prevents a warning about using old Timer class
   s.add_development_dependency 'bundler'
   s.add_development_dependency 'minitest'
   s.add_development_dependency 'rcov'

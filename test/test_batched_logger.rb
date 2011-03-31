@@ -48,6 +48,22 @@ class TestBatchedLogger < MiniTest::Unit::TestCase
     assert_empty Resque.test_jobs
   end
 
+  def test_requeue_all
+    arguments = [[1,2,3], [5,6,{:custom => :options}]]
+    SampleJob.batched do
+      arguments.each do |arg|
+        enqueue(*arg)
+      end
+    end
+    assert_equal 3, Resque.test_jobs.size
+    assert Resque.test_jobs.collect {|job| job.args.first }.include?(Resque::Plugins::BatchedLogger)
+    Resque.test_jobs.pop # Delete the batched logger job without performing it
+    assert !Resque.test_jobs.collect {|job| job.args.first }.include?(Resque::Plugins::BatchedLogger)
+    Resque::Plugins::BatchedLogger.requeue_all
+    assert_equal 3, Resque.test_jobs.size
+    assert Resque.test_jobs.collect {|job| job.args.first }.include?(Resque::Plugins::BatchedLogger)
+  end
+
   def teardown
     global_teardown
   end

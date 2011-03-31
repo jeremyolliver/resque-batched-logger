@@ -100,6 +100,41 @@ class TestBatchedLogging < MiniTest::Unit::TestCase
     assert_empty Resque.test_jobs
   end
 
+  def test_calling_batched_with_no_block
+    assert_raises(RuntimeError) do
+      SampleJob.batched
+    end
+  end
+
+  def test_queueing_multiple_jobs
+    SampleJob.batched do
+      enqueue(1,2,3)
+    end
+    assert_raises(Resque::Plugins::BatchedLogging::BatchExists) do
+      SampleJob.batched do
+        enqueue(3,4,5)
+      end
+    end
+  end
+
+  def test_custom_enqueueing_methods
+    arguments = [[1,4,5], [1,3,6]]
+    CustomJob.batched do
+      arguments.each do |args|
+        enqueue(*args)
+      end
+    end
+    assert_equal 2, CustomJob.custom_created_history.size
+    assert_equal 3, Resque.test_jobs.size
+    SuperCustomJob.batched do
+      arguments.each do |args|
+        enqueue(*args)
+      end
+    end
+    assert_equal 2, SuperCustomJob.custom_enqueued_history.size
+    assert_equal 6, Resque.test_jobs.size
+  end
+
   def teardown
     global_teardown
   end

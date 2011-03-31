@@ -1,6 +1,6 @@
 module Resque
   module Plugins
-    class BatchedLogger < Resque::Job
+    class BatchedLogger
 
       require 'time'
       require 'fileutils'
@@ -60,7 +60,7 @@ module Resque
         end
       end
 
-      private
+      protected
 
       def self.logger
         @@logger ||= File.open(LOG_FILE, "a")
