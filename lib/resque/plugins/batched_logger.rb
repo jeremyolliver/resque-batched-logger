@@ -9,6 +9,13 @@ module Resque
       LOG_FILE = "log/batched_jobs.log"
       @@logger = nil
 
+      # Requeue's all loggers
+      def self.requeue_all
+        Resque.redis.keys("*:jobcount").each do |key|
+          Resque.enqueue(self, key.gsub(":jobcount", ""))
+        end
+      end
+
       def self.perform(batch_name)
         begin
           FileUtils.mkdir_p(File.dirname(LOG_FILE))
