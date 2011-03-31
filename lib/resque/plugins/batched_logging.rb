@@ -26,8 +26,8 @@ module Resque
               else
                 raise "Must pass a block through to a batched group of jobs"
               end
-              Resque.enqueue(Resque::Plugins::BatchedLogger, batch_name) # Queue a job to proccess the log information that is stored in redis
               Resque.redis.set("#{batch_name}:jobcount", job_count)
+              Resque.enqueue(Resque::Plugins::BatchedLogger, batch_name) # Queue a job to proccess the log information that is stored in redis
             end
 
             # Plugin.around_hook for wrapping the job in logging code

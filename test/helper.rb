@@ -26,9 +26,8 @@ end
 
 def global_teardown
   # Don't do a flushdb on redis, that doesn't respect the namespace
-  Resque.redis.flushdb
-  Resque.redis.keys("*:jobcount").each {|k| Resque.redis.del("'#{k.to_s}'") }     # Clear our job count
-  Resque.redis.keys("batch_stats:*").each {|k| Resque.redis.del("'#{k.to_s}'") }  # Clear the lists of job stats
+  Resque.redis.keys("*:jobcount").each {|k| Resque.redis.del("#{k.to_s}") }     # Clear our job count
+  Resque.redis.keys("batch_stats:*").each {|k| Resque.redis.del("#{k.to_s}") }  # Clear the lists of job stats
   Resque.clear_test_jobs
   SampleJob.clear_history
   SampleModuleJob.clear_history

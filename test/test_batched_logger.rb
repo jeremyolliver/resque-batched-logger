@@ -2,7 +2,6 @@ require 'helper'
 
 class TestBatchedLogger < MiniTest::Unit::TestCase
 
-  require 'time'
   require 'parsedate'
 
   def test_log_format
@@ -19,8 +18,8 @@ class TestBatchedLogger < MiniTest::Unit::TestCase
     assert_message_logged_with_valid_times(logged_data, /batch started processing at: (.*)/)
     assert_message_logged_with_valid_times(logged_data, /batch finished processing at: (.*)/)
     assert logged_data.match(/Total run time for batch: [\d\.]+ seconds/), "log should include total run time"
-    assert logged_data.match(/Jobs Enqueued: [\d]+/), "log should include number of jobs enqueued"
-    assert logged_data.match(/Jobs Processed: [\d]+/), "log should include number of jobs processed"
+    assert logged_data.match(/Jobs Enqueued: 2/), "log should include number of jobs enqueued"
+    assert logged_data.match(/Jobs Processed: 2/), "log should include number of jobs processed"
     assert logged_data.match(/Average time per job: [\d\.]+ seconds/), "log should include average time per job"
     assert logged_data.match(/Total time spent processing jobs: [\d\.]+ seconds/), "log should total time spent processing"
     assert_message_logged_with_valid_times(logged_data, Regexp.new("==== Batched jobs \'#{batch_name}\' completed at (.*) took [\\d\\.]+ seconds ===="))
@@ -28,8 +27,11 @@ class TestBatchedLogger < MiniTest::Unit::TestCase
     assert total_run_time = logged_data.match(/Total run time for batch: ([\d\.]+) seconds/)[1]
     assert final_completion_time = logged_data.match(Regexp.new("==== Batched jobs \'#{batch_name}\' completed at .* took ([\\d\\.]+) seconds ===="))[1]
     assert_equal(total_run_time, final_completion_time, "Final completion length should match total time for batch")
+
+    assert_empty Resque.redis.keys("*:jobcount")
+    assert_empty Resque.redis.keys("batch_stats:*")
   end
-  
+
   def test_logger_running_before_jobs_finished
     Resque::Plugins::BatchedLogger.perform("SampleJob") # Should do no work
     assert_empty Resque.test_jobs
