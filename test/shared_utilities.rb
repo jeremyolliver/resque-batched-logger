@@ -21,6 +21,15 @@ class BatchedSampleJob < SampleJob
   # This subclass is simply for namespacing batched 'SampleJob's
 end
 
+class BuggyJob
+  @queue = 'buggy_job_queue'
+  extend Resque::Plugins::BatchedLogging
+
+  def self.perform(*args)
+    raise "whopps!"
+  end
+end
+
 module SampleModuleJob
   @@job_history = []
   extend Resque::Plugins::BatchedLogging

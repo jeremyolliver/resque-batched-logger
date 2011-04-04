@@ -96,8 +96,11 @@ class TestBatchedLogging < MiniTest::Unit::TestCase
     Resque.perform_test_jobs(:limit => 3) # Process just the first 3 jobs (2 batched, 1 individual, don't process the logs yet)
     assert_equal arguments, SampleJob.job_history
     assert_equal 2, Resque.redis.llen("batch_stats:BatchedSampleJob"), "Only the 2 batched jobs should have been processed as batched"
+    # Now test that when the logger runs, things are reset as they should be
     Resque.perform_test_jobs # Do the log processing
     assert_empty Resque.test_jobs
+    assert_nil Resque.redis.get("BatchedSampleJob:jobcount"), "should not have any jobcount"
+    assert_equal 0, Resque.redis.llen("batch_stats:BatchedSampleJob"), "should have no batch stats"
   end
 
   def test_calling_batched_with_no_block
@@ -133,6 +136,25 @@ class TestBatchedLogging < MiniTest::Unit::TestCase
     end
     assert_equal 2, SuperCustomJob.custom_enqueued_history.size
     assert_equal 6, Resque.test_jobs.size
+  end
+
+  def test_failed_jobs_dont_break_anything
+    BuggyJob.batched { enqueue }
+    assert_equal 2, Resque.test_jobs.size, "2 jobs (the enqueued one and the logger) should have been queued"
+    assert_equal 1, Resque.redis.get("BuggyJob:jobcount").to_i, "should have listed 1 job on the queue"
+    assert_equal 0, Resque.redis.llen("batch_stats:BuggyJob"), "should not have processed batch stats yet"
+
+    # Now test that when the queued job is run and fails, it still adds a batch stat, and doesn't affect jobcount
+    assert_raises(RuntimeError) { Resque.perform_test_jobs(:limit => 1) } # this raises an error when the job executes
+    assert_equal 1, Resque.test_jobs.size, "1 job should be remaining on the queue"
+    assert_equal 1, Resque.redis.get("BuggyJob:jobcount").to_i, "should have no more of this job counted"
+    assert_equal 1, Resque.redis.llen("batch_stats:BuggyJob"), "should have 1 processed batch stats"
+
+    # Now test that when the logger runs, things are reset as they should be
+    Resque.perform_test_jobs # Do the log processing
+    assert_empty Resque.test_jobs
+    assert_nil Resque.redis.get("BuggyJob:jobcount"), "should not have any jobcount"
+    assert_equal 0, Resque.redis.llen("batch_stats:BuggyJob"), "should have no batch stats"
   end
 
   def teardown

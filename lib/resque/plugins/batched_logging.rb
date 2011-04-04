@@ -2,8 +2,6 @@ module Resque
   module Plugins
     module BatchedLogging
 
-      require 'benchmark'
-
       class BatchExists < StandardError; end;
 
       # MyJob.batched(:batch_name => "MyCustomBatchName") do
@@ -33,13 +31,17 @@ module Resque
         if Resque.redis.get("#{batch_name}:jobcount")
           # Perform our logging
           start_time = Time.now
-          run_time = Benchmark.realtime do
+          begin
             yield
+          ensure
+            # Run the following in an ensure block, so if an exception is raised in the job's execution, it won't lock up the logger
+            end_time = Time.now
+            run_time = (end_time - start_time)
+
+            # Store, [run_time, start_time, end_time] as an entry into redis under in an array for this specific job type & queue
+            # Push the values onto the end of the list (via rpush, will create the list if it doesn't exist)
+            Resque.redis.rpush("batch_stats:#{batch_name}", [run_time, start_time, end_time].to_json)
           end
-          end_time = Time.now
-          # Store, [run_time, start_time, end_time] as an entry into redis under in an array for this specific job type & queue
-          # rpush appends to the end of a list in redis
-          Resque.redis.rpush("batch_stats:#{batch_name}", [run_time, start_time, end_time].to_json) # Push the values onto the end of the list (will create the list if it doesn't exist)
           # End of our logging
         else
           yield # Just perform the standard job without benchmarking
