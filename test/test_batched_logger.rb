@@ -15,18 +15,13 @@ class TestBatchedLogger < MiniTest::Unit::TestCase
     Resque.perform_test_jobs
     logged_data = File.read(Resque::Plugins::BatchedLogger::LOG_FILE)
     assert_message_logged_with_valid_times(logged_data, Regexp.new("==== Batched jobs \'#{batch_name}\' : logged at (.*) ===="))
-    assert_message_logged_with_valid_times(logged_data, /batch started processing at: (.*)/)
-    assert_message_logged_with_valid_times(logged_data, /batch finished processing at: (.*)/)
-    assert logged_data.match(/Total run time for batch: [\d\.]+ seconds/), "log should include total run time"
     assert logged_data.match(/Jobs Enqueued: 2/), "log should include number of jobs enqueued"
     assert logged_data.match(/Jobs Processed: 2/), "log should include number of jobs processed"
-    assert logged_data.match(/Average time per job: [\d\.]+ seconds/), "log should include average time per job"
-    assert logged_data.match(/Total time spent processing jobs: [\d\.]+ seconds/), "log should total time spent processing"
-    assert_message_logged_with_valid_times(logged_data, Regexp.new("==== Batched jobs \'#{batch_name}\' completed at (.*) took [\\d\\.]+ seconds ===="))
-
-    assert total_run_time = logged_data.match(/Total run time for batch: ([\d\.]+) seconds/)[1]
-    assert final_completion_time = logged_data.match(Regexp.new("==== Batched jobs \'#{batch_name}\' completed at .* took ([\\d\\.]+) seconds ===="))[1]
-    assert_equal(total_run_time, final_completion_time, "Final completion length should match total time for batch")
+    assert_message_logged_with_valid_times(logged_data, /Batch started: (.*)/)
+    assert_message_logged_with_valid_times(logged_data, /Batch finished: (.*)/)
+    assert logged_data.match(/Batch total run time: [\d\.]+ seconds/), "log should include total run time"
+    assert logged_data.match(/Batch average per job: [\d\.]+ seconds/), "log should include average time per job"
+    assert logged_data.match(/Total time spent across all workers: [\d\.]+ seconds/), "log should total time spent processing"
 
     assert_empty Resque.redis.keys("*:jobcount")
     assert_empty Resque.redis.keys("batch_stats:*")

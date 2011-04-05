@@ -30,20 +30,16 @@ module Resque
             # Start processing the logs
             # Pull in the info stored in redis
             job_stats = {
-              :processing_time => 0,      :longest_processing_time => 0,
-              :processed_job_count => 0,  :enqueued_job_count => Resque.redis.get("#{batch_name}:jobcount"),
-              :start_time => nil,         :finish_time => nil
+              :collective_processing_time => 0, :start_time => nil, :finish_time => nil,
+              :processed_job_count => 0, :enqueued_job_count => Resque.redis.get("#{batch_name}:jobcount")
             }
             Resque.redis.del("#{batch_name}:jobcount") # Stop any other logging processes picking up the same job
             # lpop pops the first element off the list in redis
             while job = Resque.redis.lpop("batch_stats:#{batch_name}")
-              job = decode_job(job) # Decode from string format
-              # job => [run_time, start_time, end_time]
-              job_stats[:processing_time] += job[0]                                                           # run_time
-              job_stats[:longest_processing_time] = job[0] if job[0] > job_stats[:longest_processing_time]
-              job_stats[:start_time] ||= job[1]                                                               # start_time
-              job_stats[:finish_time] ||= job[2]
-              job_stats[:finish_time] = job[2] if job[2] > job_stats[:finish_time]                            # end_time
+              job = decode_job(job) # Decode from string format, => [run_time, start_time, end_time]
+              job_stats[:collective_processing_time] += job[0]
+              job_stats[:start_time] = job[1] if !job_stats[:start_time] || job[1] < job_stats[:start_time]
+              job_stats[:finish_time] = job[2] if !job_stats[:finish_time] || job[2] > job_stats[:finish_time]
               job_stats[:processed_job_count] += 1
             end
             Resque.redis.del("batch_stats:#{batch_name}") # Cleanup the array of stats we've just processed (it should be empty now)
@@ -67,27 +63,23 @@ module Resque
       end
 
       def self.log_stats(batch_name, job_stats)
-        job_stats[:total_time] = job_stats[:finish_time] - job_stats[:start_time]
+        total_time = job_stats[:finish_time] - job_stats[:start_time]
+        average_time = total_time / job_stats[:processed_job_count].to_f
 
-        # Aggregate stats
-        job_stats[:average_time] = job_stats[:total_time] / job_stats[:processed_job_count].to_f
-
-        logger.puts "==== Batched jobs '#{batch_name}' : logged at #{Time.now.to_s} ===="
-        logger.puts "  batch started processing at: #{job_stats[:start_time]}"
-        logger.puts "  batch finished processing at: #{job_stats[:finish_time]}"
-        logger.puts "  Total run time for batch: #{job_stats[:total_time]} seconds"
-
-        logger.puts "  Jobs Enqueued: #{job_stats[:enqueued_job_count]}"
-        logger.puts "  Jobs Processed: #{job_stats[:processed_job_count]}"
-        logger.puts "  Average time per job: #{job_stats[:average_time]} seconds"
-        logger.puts "  Total time spent processing jobs: #{job_stats[:processing_time]} seconds"
-
-        logger.puts "==== Batched jobs '#{batch_name}' completed at #{job_stats[:finish_time]} took #{job_stats[:total_time]} seconds ===="
+        logger.puts "==== Batched jobs '#{batch_name}' : logged at #{Time.now} ===="
+        logger.puts "  Jobs Enqueued: #{job_stats[:enqueued_job_count]}, Jobs Processed: #{job_stats[:processed_job_count]}"
+        logger.puts "  Batch started: #{job_stats[:start_time]}"
+        logger.puts "  Batch finished: #{job_stats[:finish_time]}"
+        logger.puts "  Batch total run time: #{total_time} seconds"
+        logger.puts "  Batch average per job: #{average_time} seconds"
+        logger.puts "  Total time spent across all workers: #{job_stats[:collective_processing_time]} seconds"
+        logger.puts "" # a new line to make things more readable
       end
 
       def self.log_empty_batch(batch_name)
-        logger.puts "==== Batched jobs '#{batch_name}' : logged at #{Time.now.to_s} ===="
-        logger.puts "==== Batched jobs '#{batch_name}' completed, 0 jobs enqueued ===="
+        logger.puts "==== Batched jobs '#{batch_name}' : logged at #{Time.now} ===="
+        logger.puts "  Jobs Enqueued: 0, Jobs Processed: 0"
+        logger.puts "" # a new line to make things more readable
       end
 
       # It is possible that there might be more jobs processed than the number specified, in those cases we will process them all anyway
