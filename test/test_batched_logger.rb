@@ -2,8 +2,6 @@ require 'helper'
 
 class TestBatchedLogger < MiniTest::Unit::TestCase
 
-  require 'parsedate'
-
   def test_log_format
     arguments = [[1,2,3], [5,6,{:custom => :options}]]
     batch_name = "SampleJob"
@@ -74,10 +72,9 @@ class TestBatchedLogger < MiniTest::Unit::TestCase
     end
   end
 
+  # Returns true if the string's Year, Month and Day can be correctly determined
   def valid_date?(string)
-    # Returns true if the string's Year, Month and Day can be correctly determined
-    # parsedate returns an array of values for a date/time starting with year, decreasing in size
-    (d = ParseDate.parsedate(string)) && d[0..2].compact.size == 3
+    Date.parse(string)
   end
 
 end

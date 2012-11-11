@@ -3,6 +3,7 @@ SimpleCov.start
 
 require 'minitest/unit'
 require 'resque'
+require 'debugger'
 
 # Namespace our tests
 Resque.redis = Redis::Namespace.new('batched-logger/test:', :redis => Resque.redis)
