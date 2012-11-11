@@ -1,4 +1,4 @@
-# Resque Batched Logger
+# Resque Batched Logger [![Build Status](https://secure.travis-ci.org/jeremyolliver/gvis.png)](http://travis-ci.org/jeremyolliver/gvis)
 
 ResqueBatchedLogger is an extension to [Resque](https://github.com/defunkt/resque).
 It provides timing and logging for a 'batch' (logical grouping) of enqueued
@@ -8,6 +8,25 @@ For example, if you have a daily import process which spawns a large amount of
 several types of jobs, which collectively take a couple of hours to complete,
 this extension lets you track the total time, when jobs finished, and the amount
 of time each job took to execute.
+
+Paid Alternatives - The newly released [Sidekiq](https://github.com/mperham/sidekiq) library which is a Resque alternative does have support for batches and notfication - this is currently a paid 'pro' feature
+
+## Threading Caveats
+
+The .batched method sets class level variables to be able to transparently affect any enqueued jobs within the block scope.
+This is likely not threadsafe which may cause jobs enqueued in one thread to read the altered class level variables and
+be enqueued as part of the batch that's being loaded in another thread. The batched job tracking will stop counting when it sees
+the number of jobs coming through marked as batch as the expected number.
+
+## Ruby 1.8
+
+When using with a Ruby 1.8 implementation (for example Standard MRI ruby, or Ruby Enterprise Edition) it is highly recommended to use the gem SystemTimer >= 1.1
+This is something that's required to get accurated timings for resque within ruby 1.8, which is of higher importance when using this gem because the tracking
+of the batches depends on checking runtimes and does aggregate stats for your batches
+
+## Ruby 1.9
+
+Ruby 1.9 incompatible code has now been removed, and the test suite is passing. Though it has not had any significant production testing, which may be advisable
 
 ## Installation
 
