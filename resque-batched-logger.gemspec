@@ -22,7 +22,9 @@ Gem::Specification.new do |s|
   s.add_dependency 'redis'
   s.add_dependency 'json'
   s.add_dependency 'SystemTimer', '>= 1.1' # prevents a warning about using old Timer class
+
+  s.add_development_dependency 'rake'
   s.add_development_dependency 'bundler'
   s.add_development_dependency 'minitest'
-  s.add_development_dependency 'rcov'
+  s.add_development_dependency 'simplecov'
 end
