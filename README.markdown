@@ -1,4 +1,4 @@
-# Resque Batched Logger [![Build Status](https://secure.travis-ci.org/jeremyolliver/gvis.png)](http://travis-ci.org/jeremyolliver/gvis)
+# Resque Batched Logger [![Build Status](https://secure.travis-ci.org/jeremyolliver/resque-batched-logger.png)](http://travis-ci.org/jeremyolliver/resque-batched-logger)
 
 ResqueBatchedLogger is an extension to [Resque](https://github.com/defunkt/resque).
 It provides timing and logging for a 'batch' (logical grouping) of enqueued
